@@ -7,6 +7,11 @@
       "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
     }
   ],
+  "hosting": {
+    "public": "public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "/api/signup", "function": "signup" }]
+  },
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
