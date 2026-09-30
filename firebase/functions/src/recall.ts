@@ -8,10 +8,26 @@
 // an indexed search: you pay in read-ops what Postgres gave you in an index.
 
 import { onRequest } from "firebase-functions/v2/https";
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { db } from "./admin";
 import { getUserFromRequest } from "./shared/auth";
 import { startOfLocalDay } from "./shared/tz";
+
+interface Item {
+  kind?: string;
+  thing: string;
+  rawText: string;
+  location: string | null;
+  detail?: string | null;
+  isSecret: boolean;
+}
+
+// How each kind is said back. Add a kind -> add a line here.
+export function speakItem(item: Item): string {
+  if (item.kind === "person") return item.detail ? `${item.thing}: ${item.detail}.` : `${item.thing}.`;
+  if (item.kind === "todo") return `${item.thing}${item.detail ? `, ${item.detail}` : ""}.`;
+  return item.location ? `You put the ${item.thing} ${item.location}.` : `${item.thing}.`;
+}
 
 function isReminderQuery(query: string): boolean {
   return /\b(today|tomorrow|this week|upcoming|due|reminders?)\b/i.test(query);
@@ -35,7 +51,7 @@ function reminderWindow(query: string, timeZone: string): { start: Date; end: Da
 
 const STOPWORDS = new Set([
   "a", "an", "the", "is", "are", "was", "were", "i", "my", "me", "you", "your",
-  "where", "what", "do", "does", "did", "put", "place", "placed", "have", "has",
+  "where", "what", "who", "whos", "who's", "do", "does", "did", "put", "place", "placed", "have", "has",
   "had", "in", "on", "at", "to", "of", "for", "with", "this", "that", "it", "and", "or",
 ]);
 
@@ -65,7 +81,7 @@ function bestMatchIndex(query: string, items: { rawText: string }[]): number {
   return bestIdx;
 }
 
-export const recall = onRequest(async (req, res) => {
+export const recall = onRequest({ cors: true }, async (req, res) => {
   const user = await getUserFromRequest(req);
   if (!user) {
     res.status(401).send("unauthorized");
@@ -103,8 +119,9 @@ export const recall = onRequest(async (req, res) => {
     const parts = snap.docs.map((doc) =>
       doc.data().isSecret ? "something you marked private" : doc.data().thing
     );
+    const originals = snap.docs.filter((d) => !d.data().isSecret).map((d) => d.data().rawText);
     const speak = `You have ${parts.length} thing${parts.length > 1 ? "s" : ""}: ${parts.join(", ")}.`;
-    res.json({ speak });
+    res.json({ speak, originals });
     return;
   }
 
@@ -116,7 +133,7 @@ export const recall = onRequest(async (req, res) => {
     return;
   }
 
-  const items = snap.docs.map((doc) => doc.data() as { thing: string; rawText: string; location: string | null; isSecret: boolean });
+  const items = snap.docs.map((doc) => doc.data() as Item);
   const bestIdx = bestMatchIndex(query, items);
 
   if (bestIdx === -1) {
@@ -125,11 +142,16 @@ export const recall = onRequest(async (req, res) => {
   }
 
   const best = items[bestIdx];
-  const speak = best.isSecret
-    ? "That's something you marked private. Check your phone for the details."
-    : best.location
-    ? `You put the ${best.thing} ${best.location}.`
-    : best.thing;
+  if (best.isSecret) {
+    // Stays flagged until the person marks it read in the app. Best-effort: a failed
+    // write shouldn't block the spoken answer.
+    await snap.docs[bestIdx].ref
+      .update({ unread: true, lastAskedAt: FieldValue.serverTimestamp() })
+      .catch(() => undefined);
+    res.json({ speak: "That's something you marked private. Check your phone for the details." });
+    return;
+  }
 
-  res.json({ speak });
+  // "original" is always returned so the client can offer "read me the original".
+  res.json({ speak: speakItem(best), original: best.rawText });
 });

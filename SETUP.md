@@ -41,9 +41,9 @@ ready to deploy.
 
 Local endpoints (ports come from `firebase.json`):
 ```
-http://127.0.0.1:5001/demo-reminders/us-central1/signup
-http://127.0.0.1:5001/demo-reminders/us-central1/capture
-http://127.0.0.1:5001/demo-reminders/us-central1/recall
+http://127.0.0.1:5002/demo-reminders/us-central1/signup
+http://127.0.0.1:5002/demo-reminders/us-central1/capture
+http://127.0.0.1:5002/demo-reminders/us-central1/recall
 ```
 The Emulator UI (Firestore data browser, function logs) is at `http://127.0.0.1:4000`.
 
@@ -56,6 +56,27 @@ second terminal alongside the emulator.
 **Reaching it from an iPhone:** `127.0.0.1` only works on the Mac itself. On the same Wi-Fi, use
 the Mac's LAN IP instead. Away from home you need a tunnel (Tailscale, ngrok), and the Mac has to
 be awake.
+
+## End-to-end local testing (app + emulator)
+Needs Java (see above). From the repo root, in separate terminals:
+```
+npm install && npm --prefix firebase/functions install && npm --prefix app install
+npm run backend     # builds functions, starts the Firestore + Functions emulators
+npm run seed        # dev user "dev-local-key" (tin PIN 1234) + 11 sample items
+npm run e2e         # API test suite: signup, capture, list, PIN/redaction, recall, delete
+npm run app         # web app; app/.env.local points it at the emulator
+```
+`npm run seed` is safe to re-run; it resets the dev user's items. `npm run e2e` creates its own
+throwaway users, so it never touches seeded data. Delete `app/.env.local` (or unset the two
+variables) to run the app against in-memory mock data instead.
+
+The app's extra endpoints, all `POST` with `x-app-key`:
+- `items` -> `{items: [...]}`, newest first. Secret items come back redacted
+  (`thing: "private thing"`, empty text) unless the `x-tin-pin` header carries the right PIN.
+- `removeItem` `{id}` -> `{ok: true}`. Deleting a secret item also needs `x-tin-pin`.
+- `unlock` `{pin}` -> `{ok: true}` (200) or `{ok: false}` (401).
+- `capture` also accepts `"secret": true` and now returns the saved `item` alongside `speak`.
+- `signup` also accepts an optional 4-digit `pin` for the tin.
 
 ## Deploying to hosted Firebase
 
@@ -137,7 +158,7 @@ Both return `{"speak": "..."}`.
 ## Test it
 Set `BASE` to either the local or hosted endpoint root:
 ```
-BASE=http://127.0.0.1:5001/demo-reminders/us-central1
+BASE=http://127.0.0.1:5002/demo-reminders/us-central1
 # or: BASE=https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net
 ```
 

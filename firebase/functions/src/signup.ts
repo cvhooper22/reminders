@@ -11,13 +11,19 @@ import { randomBytes } from "node:crypto";
 import { onRequest } from "firebase-functions/v2/https";
 import { FieldValue } from "firebase-admin/firestore";
 import { db } from "./admin";
+import { hashPin, isValidPin } from "./shared/pin";
 import { isValidTimeZone } from "./shared/tz";
 
-export const signup = onRequest(async (req, res) => {
-  const { name, timezone } = req.body ?? {};
+export const signup = onRequest({ cors: true }, async (req, res) => {
+  const { name, timezone, pin } = req.body ?? {};
 
   if (timezone !== undefined && (typeof timezone !== "string" || !isValidTimeZone(timezone))) {
     res.status(400).json({ error: "unknown timezone" });
+    return;
+  }
+  // Optional 4-digit PIN for the locked tin (needed by the app; Siri-only users can skip it).
+  if (pin !== undefined && !isValidPin(pin)) {
+    res.status(400).json({ error: "pin must be 4 digits" });
     return;
   }
 
@@ -30,6 +36,7 @@ export const signup = onRequest(async (req, res) => {
     .set({
       name: name || null,
       timezone: timezone || "UTC",
+      pinHash: pin ? hashPin(pin) : null,
       createdAt: FieldValue.serverTimestamp(),
     });
 

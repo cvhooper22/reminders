@@ -4,6 +4,8 @@ import { db } from "../admin";
 export interface AuthedUser {
   apiKey: string;
   timezone: string;
+  /** Salted scrypt hash of the locked-tin PIN, if the person set one. */
+  pinHash: string | null;
 }
 
 // The api_key IS the users/{apiKey} document id, so this is a single doc get --
@@ -16,5 +18,9 @@ export async function getUserFromRequest(req: Request): Promise<AuthedUser | nul
   if (!snap.exists) return null;
 
   const data = snap.data()!;
-  return { apiKey, timezone: (data.timezone as string) || "UTC" };
+  return {
+    apiKey,
+    timezone: (data.timezone as string) || "UTC",
+    pinHash: (data.pinHash as string) || null,
+  };
 }
