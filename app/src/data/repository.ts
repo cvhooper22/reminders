@@ -1,0 +1,19 @@
+import type { Item } from '../types';
+
+/**
+ * Everything the UI needs from a backend. Screens only talk to this interface, so
+ * swapping the mock for the Firebase backend is a one-line change in App.tsx.
+ *
+ * Secret items come back redacted (placeholder text) until `unlock` succeeds;
+ * after that `list()` returns them in full, until `lock()` is called.
+ */
+export interface ItemsRepository {
+  list(): Promise<Item[]>;
+  capture(rawText: string, opts?: { secret?: boolean }): Promise<Item>;
+  remove(id: string): Promise<void>;
+  /** Mark a private item unread (flagged) or read (cleared). */
+  setUnread(id: string, unread: boolean): Promise<void>;
+  /** Resolves true if the PIN is right; the repository then reveals secrets. */
+  unlock(pin: string): Promise<boolean>;
+  lock(): void;
+}
