@@ -79,6 +79,12 @@ export class HttpRepository implements ItemsRepository {
     await this.ok(await this.post('removeItem', { id }), 'remove');
   }
 
+  async update(id: string, fields: { thing: string; where: string | null }) {
+    const res = await this.ok(await this.post('updateItem', { id, ...fields }), 'update');
+    const { item } = (await res.json()) as { item: ItemJson };
+    return revive(item);
+  }
+
   async setUnread(id: string, unread: boolean) {
     await this.ok(await this.post('setUnread', { id, unread }), 'setUnread');
   }

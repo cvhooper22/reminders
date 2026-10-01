@@ -10,6 +10,7 @@ type Ctx = {
   unlocked: boolean;
   capture: (rawText: string, opts?: { secret?: boolean }) => Promise<Item>;
   remove: (id: string) => Promise<void>;
+  update: (id: string, fields: { thing: string; where: string | null }) => Promise<void>;
   setUnread: (id: string, unread: boolean) => Promise<void>;
   /** Resolves true (and opens the tin) if the PIN is right. */
   unlock: (pin: string) => Promise<boolean>;
@@ -68,6 +69,14 @@ export function ItemsProvider({
     [repository],
   );
 
+  const update = useCallback<Ctx['update']>(
+    async (id, fields) => {
+      const saved = await repository.update(id, fields);
+      setItems((prev) => prev.map((i) => (i.id === id ? saved : i)));
+    },
+    [repository],
+  );
+
   const setUnread = useCallback<Ctx['setUnread']>(
     async (id, unread) => {
       await repository.setUnread(id, unread);
@@ -97,8 +106,8 @@ export function ItemsProvider({
   }, [repository]);
 
   const value = useMemo(
-    () => ({ items, loading, unlocked, capture, remove, setUnread, unlock, lock }),
-    [items, loading, unlocked, capture, remove, setUnread, unlock, lock],
+    () => ({ items, loading, unlocked, capture, remove, update, setUnread, unlock, lock }),
+    [items, loading, unlocked, capture, remove, update, setUnread, unlock, lock],
   );
 
   return <ItemsContext.Provider value={value}>{children}</ItemsContext.Provider>;

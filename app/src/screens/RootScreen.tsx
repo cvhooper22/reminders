@@ -22,7 +22,7 @@ const FILTERS: { key: Filter; label: string }[] = [
  * chrome. Swap this for react-navigation when the app grows past three screens.
  */
 export function RootScreen({ onLogout }: { onLogout?: () => void }) {
-  const { items, unlocked, capture, remove, setUnread, unlock, lock } = useItems();
+  const { items, unlocked, capture, remove, update, setUnread, unlock, lock } = useItems();
   const toggleNight = useToggleMode();
 
   const [filter, setFilter] = useState<Filter>('all');
@@ -110,6 +110,7 @@ export function RootScreen({ onLogout }: { onLogout?: () => void }) {
             unlocked={unlocked}
             onLockedPress={() => setPadOpen(true)}
             onRemove={remove}
+            onSave={update}
             onToggleUnread={(item) => setUnread(item.id, !item.unread)}
           />
         )}

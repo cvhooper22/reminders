@@ -1,0 +1,80 @@
+name: Deploy
+
+# Deploys to Firebase when main changes, but only the targets whose files changed:
+#   functions -> firebase/functions/**
+#   hosting   -> app/** (the web build) and the hosting config
+#   firestore -> rules + indexes
+# Run it by hand (Actions tab -> Deploy -> Run workflow) to force all three.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@v3
+        id: changed
+        with:
+          filters: |
+            functions:
+              - 'firebase/functions/**'
+            hosting:
+              - 'app/**'
+              - 'firebase/firebase.json'
+            firestore:
+              - 'firebase/firestore.rules'
+              - 'firebase/firestore.indexes.json'
+
+      - name: Pick deploy targets
+        id: targets
+        env:
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+          FUNCTIONS: ${{ steps.changed.outputs.functions }}
+          HOSTING: ${{ steps.changed.outputs.hosting }}
+          FIRESTORE: ${{ steps.changed.outputs.firestore }}
+        run: |
+          only=()
+          if [ "$MANUAL" = true ] || [ "$FUNCTIONS" = true ]; then only+=(functions); fi
+          if [ "$MANUAL" = true ] || [ "$HOSTING" = true ]; then only+=(hosting); fi
+          if [ "$MANUAL" = true ] || [ "$FIRESTORE" = true ]; then only+=(firestore); fi
+          echo "only=$(IFS=,; echo "${only[*]}")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        if: steps.targets.outputs.only != ''
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+            firebase/functions/package-lock.json
+
+      - name: Install
+        if: steps.targets.outputs.only != ''
+        run: |
+          npm ci
+          npm --prefix firebase/functions ci
+          npm --prefix app ci
+
+      - uses: google-github-actions/auth@v2
+        if: steps.targets.outputs.only != ''
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy ${{ steps.targets.outputs.only }}
+        if: steps.targets.outputs.only != ''
+        working-directory: firebase
+        run: npx firebase deploy --only "${{ steps.targets.outputs.only }}" --project reminders-f3d4a --non-interactive
