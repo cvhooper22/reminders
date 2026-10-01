@@ -4,7 +4,7 @@
 //
 // Creates a fresh user via /signup each run, so it never touches seeded data.
 
-const BASE = process.env.BASE || "http://127.0.0.1:5002/demo-reminders/us-central1";
+const BASE = process.env.BASE || "http://127.0.0.1:5002/demo-reminders/us-west3";
 const PIN = "4321";
 
 let failures = 0;

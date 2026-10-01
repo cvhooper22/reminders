@@ -25,7 +25,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:web": "EXPO_PUBLIC_API_BASE=https://us-west3-reminders-f3d4a.cloudfunctions.net expo export --clear --platform web --output-dir ../firebase/dist"
   },
   "private": true
 }

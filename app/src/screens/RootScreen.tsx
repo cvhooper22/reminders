@@ -21,7 +21,7 @@ const FILTERS: { key: Filter; label: string }[] = [
  * Owns navigation state (filter, query, PIN pad, toss sheet) and the persistent
  * chrome. Swap this for react-navigation when the app grows past three screens.
  */
-export function RootScreen() {
+export function RootScreen({ onLogout }: { onLogout?: () => void }) {
   const { items, unlocked, capture, remove, setUnread, unlock, lock } = useItems();
   const toggleNight = useToggleMode();
 
@@ -74,7 +74,7 @@ export function RootScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 20, paddingTop: 12, gap: 16 }}>
-        <AppHeader unlocked={unlocked} onTogglePad={onTogglePad} onToggleNight={toggleNight} />
+        <AppHeader unlocked={unlocked} onTogglePad={onTogglePad} onToggleNight={toggleNight} onLogout={onLogout} />
         {padOpen ? null : (
           <>
             <SearchField value={query} onChangeText={onSearch} />

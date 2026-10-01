@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { UnauthorizedError } from '../data/httpRepository';
 import type { ItemsRepository } from '../data/repository';
 import type { Item } from '../types';
 
@@ -19,9 +20,12 @@ const ItemsContext = createContext<Ctx | null>(null);
 
 export function ItemsProvider({
   repository,
+  onUnauthorized,
   children,
 }: {
   repository: ItemsRepository;
+  /** The backend rejected the stored key (e.g. the account was deleted). */
+  onUnauthorized?: () => void;
   children: React.ReactNode;
 }) {
   const [items, setItems] = useState<Item[]>([]);
@@ -30,15 +34,22 @@ export function ItemsProvider({
 
   useEffect(() => {
     let live = true;
-    repository.list().then((list) => {
-      if (!live) return;
-      setItems(list);
-      setLoading(false);
-    });
+    repository
+      .list()
+      .then((list) => {
+        if (!live) return;
+        setItems(list);
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (!live) return;
+        setLoading(false);
+        if (e instanceof UnauthorizedError) onUnauthorized?.();
+      });
     return () => {
       live = false;
     };
-  }, [repository]);
+  }, [repository, onUnauthorized]);
 
   const capture = useCallback<Ctx['capture']>(
     async (rawText, opts) => {

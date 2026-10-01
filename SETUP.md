@@ -41,9 +41,9 @@ ready to deploy.
 
 Local endpoints (ports come from `firebase.json`):
 ```
-http://127.0.0.1:5002/demo-reminders/us-central1/signup
-http://127.0.0.1:5002/demo-reminders/us-central1/capture
-http://127.0.0.1:5002/demo-reminders/us-central1/recall
+http://127.0.0.1:5002/demo-reminders/us-west3/signup
+http://127.0.0.1:5002/demo-reminders/us-west3/capture
+http://127.0.0.1:5002/demo-reminders/us-west3/recall
 ```
 The Emulator UI (Firestore data browser, function logs) is at `http://127.0.0.1:4000`.
 
@@ -82,7 +82,7 @@ The app's extra endpoints, all `POST` with `x-app-key`:
 
 ### 1. Create the project
 - Go to console.firebase.google.com, create a free project (Spark plan is fine).
-- Enable Firestore (Native mode, pick any region) from the console.
+- Enable Firestore (Native mode, location `us-west3`) from the console.
 
 ### 2. Link and set secrets
 ```
@@ -113,11 +113,22 @@ plus the Firestore security rules that deny all direct client access.
 
 ### 5. Your endpoints
 ```
-https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/signup
-https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/capture
-https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/recall
+https://us-west3-YOUR_PROJECT_ID.cloudfunctions.net/signup
+https://us-west3-YOUR_PROJECT_ID.cloudfunctions.net/capture
+https://us-west3-YOUR_PROJECT_ID.cloudfunctions.net/recall
 ```
-(Region may differ if you picked something other than `us-central1` for Firestore.)
+(Functions are pinned to `us-west3` in `firebase/functions/src/admin.ts` to match the Firestore location.)
+
+## The web app and signup page
+Firebase Hosting serves the built web app (exported to `firebase/dist`) at the site root, with the signup page at
+`/setup.html` (source: `app/public/setup.html`). People sign up there, get their `api_key`, and
+click "Open my drawer" (or paste the key on the app's login screen). To publish both:
+```
+cd firebase
+npx firebase deploy --only hosting
+```
+The `predeploy` hook runs `npm --prefix ../app run build:web`. That script pins the production
+backend URL itself, so a local `app/.env.local` never leaks into the deployed bundle.
 
 ## How a new person joins
 1. They call `/signup` once (this is what the setup web page will do automatically):
@@ -158,8 +169,8 @@ Both return `{"speak": "..."}`.
 ## Test it
 Set `BASE` to either the local or hosted endpoint root:
 ```
-BASE=http://127.0.0.1:5002/demo-reminders/us-central1
-# or: BASE=https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net
+BASE=http://127.0.0.1:5002/demo-reminders/us-west3
+# or: BASE=https://us-west3-YOUR_PROJECT_ID.cloudfunctions.net
 ```
 
 ```
