@@ -55,11 +55,9 @@ export const removeItem = onRequest({ cors: true }, async (req, res) => {
   res.json({ ok: true });
 });
 
-const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 // Fix a mis-captured item. `thing` is the label; `where` is the kind-specific line shown
-// under it (a stash's location, otherwise the detail). Recall matches on rawText, so the
-// old label is swapped for the new one there too, or searching the corrected word would miss.
+// under it (a stash's location, otherwise the detail). rawText stays the untouched original;
+// `edited` tells recall to match on these corrected fields instead of the stale sentence.
 export const updateItem = onRequest({ cors: true }, async (req, res) => {
   const user = await getUserFromRequest(req);
   if (!user) {
@@ -88,14 +86,9 @@ export const updateItem = onRequest({ cors: true }, async (req, res) => {
 
   const newWhere = typeof where === "string" ? where.trim() || null : null;
   const kind = data.kind ?? (data.remindAt ? "todo" : "stash");
-  const rawText =
-    data.thing && typeof data.rawText === "string"
-      ? data.rawText.replace(new RegExp(escapeRegExp(data.thing), "i"), () => newThing)
-      : data.rawText;
-
   await ref.update({
     thing: newThing,
-    rawText,
+    edited: true,
     ...(kind === "stash" ? { location: newWhere } : { detail: newWhere }),
   });
   res.json({ item: serializeItem(id, (await ref.get()).data()!, true) });

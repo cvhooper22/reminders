@@ -20,6 +20,8 @@ interface Item {
   location: string | null;
   detail?: string | null;
   isSecret: boolean;
+  /** Set once the person corrects the item in the app; rawText is then out of date. */
+  edited?: boolean;
 }
 
 // How each kind is said back. Add a kind -> add a line here.
@@ -62,15 +64,22 @@ function tokenize(text: string): string[] {
     .filter((word) => word.length > 0 && !STOPWORDS.has(word));
 }
 
+// What a query is matched against. The original sentence has the most vocabulary, but once
+// an item has been edited it describes the old (wrong) version, so only the fields count.
+export function searchText(item: Item): string {
+  const fields = [item.thing, item.location, item.detail].filter(Boolean).join(" ");
+  return item.edited ? fields : `${item.rawText} ${fields}`;
+}
+
 // Highest word-overlap with `query` wins; -1 if nothing overlaps at all.
-function bestMatchIndex(query: string, items: { rawText: string }[]): number {
+function bestMatchIndex(query: string, items: Item[]): number {
   const queryWords = new Set(tokenize(query));
   if (queryWords.size === 0) return -1;
 
   let bestIdx = -1;
   let bestScore = 0;
   items.forEach((item, idx) => {
-    const itemWords = new Set(tokenize(item.rawText));
+    const itemWords = new Set(tokenize(searchText(item)));
     let score = 0;
     for (const word of queryWords) if (itemWords.has(word)) score++;
     if (score > bestScore) {

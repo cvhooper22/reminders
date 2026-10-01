@@ -53,7 +53,6 @@ export class MockRepository implements ItemsRepository {
     const item: Item = {
       ...old,
       thing,
-      rawText: old.rawText.replace(old.thing, thing),
       ...((old.kind ?? 'stash') === 'stash' ? { location: where } : { detail: where }),
     };
     this.items = this.items.map((i) => (i.id === id ? item : i));
