@@ -14,7 +14,7 @@ const { getFirestore, Timestamp } = require("firebase-admin/firestore");
 const { hashPin } = require("../lib/shared/pin");
 
 initializeApp({ projectId: process.env.GCLOUD_PROJECT });
-const db = getFirestore();
+const db = getFirestore("reminders-db");
 
 const API_KEY = "dev-local-key";
 const now = Date.now();

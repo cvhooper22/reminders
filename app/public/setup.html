@@ -84,6 +84,7 @@
       <div class="key" id="key"></div>
       <div class="row">
         <button id="copy" type="button">Copy key</button>
+        <button id="open" type="button" class="ghost">Open my drawer</button>
       </div>
       <p class="warn">Save this somewhere safe. It's your only login and it can't be recovered. Anyone who has it can read your notes.</p>
     </div>
@@ -115,7 +116,7 @@
   const SHORTCUTS = { capture: "", recall: "" };
 
   // Same-origin on Firebase Hosting (/api/signup is rewritten to the function). For local
-  // testing, open this page with ?backend=http://127.0.0.1:5002/demo-reminders/us-central1
+  // testing, open this page with ?backend=http://127.0.0.1:5002/demo-reminders/us-west3
   const backend = new URLSearchParams(location.search).get("backend");
   const SIGNUP_URL = backend ? backend.replace(/\/$/, "") + "/signup" : "/api/signup";
 
@@ -161,6 +162,13 @@
       if (url) { $(id).href = url; $(id).removeAttribute("aria-disabled"); any = true; }
     }
     $("soon").hidden = any;
+
+    // Same origin as the app, so storing the key here means it opens already logged in.
+    // The storage key must match STORAGE_KEY in src/lib/session.ts.
+    $("open").addEventListener("click", () => {
+      try { localStorage.setItem("jd.apiKey", key); } catch {}
+      location.assign("/");
+    });
 
     $("copy").addEventListener("click", async () => {
       try {

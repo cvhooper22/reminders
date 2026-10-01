@@ -46,6 +46,20 @@ export class MockRepository implements ItemsRepository {
     this.items = this.items.filter((i) => i.id !== id);
   }
 
+  async update(id: string, { thing, where }: { thing: string; where: string | null }) {
+    await delay(60);
+    const old = this.items.find((i) => i.id === id);
+    if (!old) throw new Error('not found');
+    const item: Item = {
+      ...old,
+      thing,
+      rawText: old.rawText.replace(old.thing, thing),
+      ...((old.kind ?? 'stash') === 'stash' ? { location: where } : { detail: where }),
+    };
+    this.items = this.items.map((i) => (i.id === id ? item : i));
+    return item;
+  }
+
   async setUnread(id: string, unread: boolean) {
     await delay(60);
     this.items = this.items.map((i) => (i.id === id ? { ...i, unread } : i));

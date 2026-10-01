@@ -24,9 +24,17 @@ const revive = (j: ItemJson): Item => ({
   color: colorFor(j.id),
 });
 
+/** The backend rejected the API key (401). */
+export class UnauthorizedError extends Error {
+  constructor(what: string) {
+    super(`${what} failed (401)`);
+    this.name = 'UnauthorizedError';
+  }
+}
+
 /**
  * Talks to the Firebase functions (local emulator or deployed).
- * `baseUrl` looks like http://127.0.0.1:5001/demo-reminders/us-central1
+ * `baseUrl` looks like http://127.0.0.1:5001/demo-reminders/us-west3
  */
 export class HttpRepository implements ItemsRepository {
   private pin: string | null = null;
@@ -50,6 +58,7 @@ export class HttpRepository implements ItemsRepository {
   }
 
   private async ok(res: Response, what: string): Promise<Response> {
+    if (res.status === 401) throw new UnauthorizedError(what);
     if (!res.ok) throw new Error(`${what} failed (${res.status})`);
     return res;
   }
@@ -68,6 +77,12 @@ export class HttpRepository implements ItemsRepository {
 
   async remove(id: string) {
     await this.ok(await this.post('removeItem', { id }), 'remove');
+  }
+
+  async update(id: string, fields: { thing: string; where: string | null }) {
+    const res = await this.ok(await this.post('updateItem', { id, ...fields }), 'update');
+    const { item } = (await res.json()) as { item: ItemJson };
+    return revive(item);
   }
 
   async setUnread(id: string, unread: boolean) {

@@ -10,6 +10,27 @@ npm run ios      # or: npm run android
 
 Demo PIN for the locked tin: `1234` (dev builds show it on the keypad screen).
 
+## Login
+
+With `EXPO_PUBLIC_API_BASE` set (see `.env.example`), the app shows a login screen where a person
+pastes their API key. The key is checked against the backend and remembered in the browser's
+`localStorage` (`jd.apiKey`; web only, native doesn't remember it yet). "log out" in the header
+clears it. A key the backend later rejects (401) also sends you back to the login screen.
+Keys come from the signup page (`public/setup.html`, served at `/setup.html`), whose
+"Open my drawer" button stores the new key and lands you in the app already logged in.
+
+`EXPO_PUBLIC_API_KEY` is a dev-only shortcut that skips the login; it's ignored by production
+exports. Anyone with a key can read that person's items, and `localStorage` is readable by any
+script on the page, so don't add third-party scripts to the web build.
+
+## Building for the web
+
+```bash
+npm run build:web   # exports to firebase/dist, pointed at the deployed backend (see package.json)
+```
+`firebase deploy --only hosting` runs this for you (`predeploy` in `firebase/firebase.json`) and
+serves `firebase/dist`.
+
 ## Layout
 
 ```

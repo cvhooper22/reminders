@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { UnauthorizedError } from '../data/httpRepository';
 import type { ItemsRepository } from '../data/repository';
 import type { Item } from '../types';
 
@@ -9,6 +10,7 @@ type Ctx = {
   unlocked: boolean;
   capture: (rawText: string, opts?: { secret?: boolean }) => Promise<Item>;
   remove: (id: string) => Promise<void>;
+  update: (id: string, fields: { thing: string; where: string | null }) => Promise<void>;
   setUnread: (id: string, unread: boolean) => Promise<void>;
   /** Resolves true (and opens the tin) if the PIN is right. */
   unlock: (pin: string) => Promise<boolean>;
@@ -19,9 +21,12 @@ const ItemsContext = createContext<Ctx | null>(null);
 
 export function ItemsProvider({
   repository,
+  onUnauthorized,
   children,
 }: {
   repository: ItemsRepository;
+  /** The backend rejected the stored key (e.g. the account was deleted). */
+  onUnauthorized?: () => void;
   children: React.ReactNode;
 }) {
   const [items, setItems] = useState<Item[]>([]);
@@ -30,15 +35,22 @@ export function ItemsProvider({
 
   useEffect(() => {
     let live = true;
-    repository.list().then((list) => {
-      if (!live) return;
-      setItems(list);
-      setLoading(false);
-    });
+    repository
+      .list()
+      .then((list) => {
+        if (!live) return;
+        setItems(list);
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (!live) return;
+        setLoading(false);
+        if (e instanceof UnauthorizedError) onUnauthorized?.();
+      });
     return () => {
       live = false;
     };
-  }, [repository]);
+  }, [repository, onUnauthorized]);
 
   const capture = useCallback<Ctx['capture']>(
     async (rawText, opts) => {
@@ -53,6 +65,14 @@ export function ItemsProvider({
     async (id) => {
       await repository.remove(id);
       setItems((prev) => prev.filter((i) => i.id !== id));
+    },
+    [repository],
+  );
+
+  const update = useCallback<Ctx['update']>(
+    async (id, fields) => {
+      const saved = await repository.update(id, fields);
+      setItems((prev) => prev.map((i) => (i.id === id ? saved : i)));
     },
     [repository],
   );
@@ -86,8 +106,8 @@ export function ItemsProvider({
   }, [repository]);
 
   const value = useMemo(
-    () => ({ items, loading, unlocked, capture, remove, setUnread, unlock, lock }),
-    [items, loading, unlocked, capture, remove, setUnread, unlock, lock],
+    () => ({ items, loading, unlocked, capture, remove, update, setUnread, unlock, lock }),
+    [items, loading, unlocked, capture, remove, update, setUnread, unlock, lock],
   );
 
   return <ItemsContext.Provider value={value}>{children}</ItemsContext.Provider>;

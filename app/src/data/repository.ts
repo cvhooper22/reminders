@@ -11,6 +11,8 @@ export interface ItemsRepository {
   list(): Promise<Item[]>;
   capture(rawText: string, opts?: { secret?: boolean }): Promise<Item>;
   remove(id: string): Promise<void>;
+  /** Fix a label (`thing`) and its "where" line (location for stashes, else detail). */
+  update(id: string, fields: { thing: string; where: string | null }): Promise<Item>;
   /** Mark a private item unread (flagged) or read (cleared). */
   setUnread(id: string, unread: boolean): Promise<void>;
   /** Resolves true if the PIN is right; the repository then reveals secrets. */

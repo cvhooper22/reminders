@@ -10,10 +10,11 @@ type Props = {
   unlocked: boolean;
   onLockedPress: () => void;
   onRemove: (id: string) => void;
+  onSave: (id: string, fields: { thing: string; where: string | null }) => Promise<void>;
   onToggleUnread: (item: Item) => void;
 };
 
-export function DrawerScreen({ results, unlocked, onLockedPress, onRemove, onToggleUnread }: Props) {
+export function DrawerScreen({ results, unlocked, onLockedPress, onRemove, onSave, onToggleUnread }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
   const styles = useThemedStyles(({ c, fonts }) => ({
     count: { fontFamily: fonts.mono, fontSize: 13, color: c.inkSoft, marginBottom: 14, marginLeft: 4 },
@@ -45,6 +46,7 @@ export function DrawerScreen({ results, unlocked, onLockedPress, onRemove, onTog
                 expanded={openId === item.id}
                 onPress={() => (locked ? onLockedPress() : setOpenId(openId === item.id ? null : item.id))}
                 onRemove={() => onRemove(item.id)}
+                onSave={(fields) => onSave(item.id, fields)}
                 onToggleUnread={() => onToggleUnread(item)}
               />
             );

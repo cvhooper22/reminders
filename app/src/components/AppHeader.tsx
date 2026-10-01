@@ -8,9 +8,11 @@ type Props = {
   unlocked: boolean;
   onTogglePad: () => void;
   onToggleNight: () => void;
+  /** Present only when logged in to a real backend. */
+  onLogout?: () => void;
 };
 
-export function AppHeader({ unlocked, onTogglePad, onToggleNight }: Props) {
+export function AppHeader({ unlocked, onTogglePad, onToggleNight, onLogout }: Props) {
   const { mode } = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -21,6 +23,7 @@ export function AppHeader({ unlocked, onTogglePad, onToggleNight }: Props) {
           onPress={onTogglePad}
           accessibilityLabel={unlocked ? 'Lock the tin' : 'Open the locked tin'}
         />
+        {onLogout ? <Pill label="log out" onPress={onLogout} /> : null}
         <Pill
           label={mode === 'day' ? 'night' : 'day'}
           variant="solid"

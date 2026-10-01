@@ -126,7 +126,7 @@ export function parseExtraction(raw: string | undefined): Extracted | null {
 
 async function extractClaude(text: string): Promise<Extracted | null> {
   const apiKey = ANTHROPIC_API_KEY.value();
-  if (!apiKey) return null;
+  if (!apiKey || apiKey === "false") return null;
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",

@@ -55,6 +55,52 @@ export const removeItem = onRequest({ cors: true }, async (req, res) => {
   res.json({ ok: true });
 });
 
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Fix a mis-captured item. `thing` is the label; `where` is the kind-specific line shown
+// under it (a stash's location, otherwise the detail). Recall matches on rawText, so the
+// old label is swapped for the new one there too, or searching the corrected word would miss.
+export const updateItem = onRequest({ cors: true }, async (req, res) => {
+  const user = await getUserFromRequest(req);
+  if (!user) {
+    res.status(401).send("unauthorized");
+    return;
+  }
+
+  const { id, thing, where } = req.body ?? {};
+  const newThing = typeof thing === "string" ? thing.trim() : "";
+  if (!id || typeof id !== "string" || !newThing || (where != null && typeof where !== "string")) {
+    res.status(400).send("missing id or thing");
+    return;
+  }
+
+  const ref = db.collection("users").doc(user.apiKey).collection("items").doc(id);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    res.status(404).send("not found");
+    return;
+  }
+  const data = snap.data()!;
+  if (data.isSecret && !hasTinAccess(req, user)) {
+    res.status(403).send("locked");
+    return;
+  }
+
+  const newWhere = typeof where === "string" ? where.trim() || null : null;
+  const kind = data.kind ?? (data.remindAt ? "todo" : "stash");
+  const rawText =
+    data.thing && typeof data.rawText === "string"
+      ? data.rawText.replace(new RegExp(escapeRegExp(data.thing), "i"), () => newThing)
+      : data.rawText;
+
+  await ref.update({
+    thing: newThing,
+    rawText,
+    ...(kind === "stash" ? { location: newWhere } : { detail: newWhere }),
+  });
+  res.json({ item: serializeItem(id, (await ref.get()).data()!, true) });
+});
+
 // Recall flags a private item `unread` when it's asked for by voice; it stays flagged
 // until the person clears it here. No PIN needed: the flag reveals nothing about content.
 export const setUnread = onRequest({ cors: true }, async (req, res) => {
