@@ -12,7 +12,7 @@ import { Timestamp, FieldValue } from "firebase-admin/firestore";
 import * as chrono from "chrono-node";
 import nlp from "compromise";
 import { db } from "./admin";
-import { getUserFromRequest } from "./shared/auth";
+import { getUserFromRequest, type AuthedUser } from "./shared/auth";
 import { serializeItem } from "./shared/serialize";
 import { tzOffsetMinutes } from "./shared/tz";
 
@@ -200,19 +200,10 @@ export function analyze(text: string, timeZone: string, claude: Extracted | null
   return { kind, thing, detail, remindAt, location, extractedBy };
 }
 
-export const capture = onRequest({ cors: true, secrets: [ANTHROPIC_API_KEY] }, async (req, res) => {
-  const user = await getUserFromRequest(req);
-  if (!user) {
-    res.status(401).send("unauthorized");
-    return;
-  }
+type Result = { status: number; body: Record<string, unknown> };
 
-  const { text, secret } = req.body ?? {};
-  if (!text || typeof text !== "string") {
-    res.status(400).send("missing text");
-    return;
-  }
-
+// Parse, store and confirm one dictated sentence. Shared by the HTTP endpoint and the Alexa skill.
+export async function saveCapture(user: AuthedUser, text: string, secret?: boolean): Promise<Result> {
   const isSecret = secret === true || SECRET_PATTERN.test(text);
   const { kind, thing, detail, remindAt, location, extractedBy } = analyze(
     text,
@@ -239,8 +230,7 @@ export const capture = onRequest({ cors: true, secrets: [ANTHROPIC_API_KEY] }, a
       });
     saved = serializeItem(ref.id, (await ref.get()).data()!, true);
   } catch {
-    res.status(500).json({ speak: "Sorry, something went wrong saving that." });
-    return;
+    return { status: 500, body: { speak: "Sorry, something went wrong saving that." } };
   }
 
   const speak = isSecret
@@ -248,5 +238,22 @@ export const capture = onRequest({ cors: true, secrets: [ANTHROPIC_API_KEY] }, a
     : kind === "person"
     ? `Got it, ${thing}${detail ? `: ${detail}` : ""}.`
     : `Got it, noted: ${thing}.`;
-  res.json({ speak, item: saved });
+  return { status: 200, body: { speak, item: saved } };
+}
+
+export const capture = onRequest({ cors: true, secrets: [ANTHROPIC_API_KEY] }, async (req, res) => {
+  const user = await getUserFromRequest(req);
+  if (!user) {
+    res.status(401).send("unauthorized");
+    return;
+  }
+
+  const { text, secret } = req.body ?? {};
+  if (!text || typeof text !== "string") {
+    res.status(400).send("missing text");
+    return;
+  }
+
+  const { status, body } = await saveCapture(user, text, secret);
+  res.status(status).json(body);
 });

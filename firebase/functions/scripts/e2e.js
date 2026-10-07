@@ -92,6 +92,26 @@ async function main() {
   const left = await call("items", { key, pin: PIN });
   check("list reflects the deletes", left.json?.items?.length === 1, left.text);
 
+  // alexa: link code -> link -> capture -> recall (the emulator skips Amazon's signature check)
+  const alexa = async (userId, intent, slots = {}, type = "IntentRequest") => {
+    const body = {
+      session: { user: { userId } },
+      request: { type, intent: { name: intent, slots: Object.fromEntries(Object.entries(slots).map(([k, v]) => [k, { value: v }])) } },
+    };
+    const res = await fetch(`${BASE}/alexa`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    return (await res.json())?.response?.outputSpeech?.text ?? "";
+  };
+  const avid = `amzn1.ask.account.e2e${Date.now()}`;
+  check("alexaLinkCode rejects a missing key", (await call("alexaLinkCode")).status === 401);
+  check("alexa asks an unlinked user to link", /Link Alexa/.test(await alexa(avid, "RecallIntent", { query: "keys" })));
+  check("alexa rejects a bad link code", /didn't work/.test(await alexa(avid, "LinkIntent", { code: "123456" })));
+  const lc = await call("alexaLinkCode", { key });
+  check("alexaLinkCode returns a 6-digit code", /^\d{6}$/.test(lc.json?.code ?? ""), lc.text);
+  check("alexa links with a good code", /^Linked/.test(await alexa(avid, "LinkIntent", { code: lc.json?.code })));
+  check("alexa link code is single use", /didn't work/.test(await alexa("amzn1.ask.account.other", "LinkIntent", { code: lc.json?.code })));
+  check("alexa captures", /Got it/.test(await alexa(avid, "CaptureIntent", { text: "I put the passport in the blue folder" })));
+  check("alexa recalls", /blue folder/.test(await alexa(avid, "RecallIntent", { query: "where is my passport" })));
+
   // isolation
   const other = await call("signup", { body: { name: "Other" } });
   const otherItems = await call("items", { key: other.json?.api_key });

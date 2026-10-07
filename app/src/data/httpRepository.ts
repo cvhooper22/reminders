@@ -100,4 +100,9 @@ export class HttpRepository implements ItemsRepository {
   lock() {
     this.pin = null;
   }
+
+  async alexaLinkCode() {
+    const res = await this.ok(await this.post('alexaLinkCode'), 'alexaLinkCode');
+    return (await res.json()) as { code: string; expiresInMinutes: number };
+  }
 }

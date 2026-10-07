@@ -1,0 +1,55 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "junk drawer",
+      "intents": [
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "AMAZON.NavigateHomeIntent", "samples": [] },
+        {
+          "name": "LinkIntent",
+          "slots": [{ "name": "code", "type": "AMAZON.NUMBER" }],
+          "samples": ["link {code}", "link code {code}", "connect {code}", "my code is {code}"]
+        },
+        {
+          "name": "CaptureIntent",
+          "slots": [{ "name": "text", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "remember {text}",
+            "remember that {text}",
+            "remind me {text}",
+            "remind me to {text}",
+            "note {text}",
+            "note that {text}",
+            "save {text}",
+            "write down {text}",
+            "i put {text}",
+            "add {text}"
+          ]
+        },
+        {
+          "name": "RecallIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "where is {query}",
+            "where are {query}",
+            "where did i put {query}",
+            "where's {query}",
+            "what's {query}",
+            "what is {query}",
+            "what do i have {query}",
+            "what's on {query}",
+            "what do i know about {query}",
+            "who is {query}",
+            "who's {query}",
+            "find {query}",
+            "look up {query}"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}

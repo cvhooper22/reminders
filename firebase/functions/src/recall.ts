@@ -10,7 +10,7 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { db } from "./admin";
-import { getUserFromRequest } from "./shared/auth";
+import { getUserFromRequest, type AuthedUser } from "./shared/auth";
 import { startOfLocalDay } from "./shared/tz";
 
 interface Item {
@@ -90,19 +90,10 @@ function bestMatchIndex(query: string, items: Item[]): number {
   return bestIdx;
 }
 
-export const recall = onRequest({ cors: true }, async (req, res) => {
-  const user = await getUserFromRequest(req);
-  if (!user) {
-    res.status(401).send("unauthorized");
-    return;
-  }
+export type RecallResult = { speak: string; originals?: string[]; original?: string };
 
-  const { query } = req.body ?? {};
-  if (!query || typeof query !== "string") {
-    res.status(400).send("missing query");
-    return;
-  }
-
+// Answer one spoken question. Shared by the HTTP endpoint and the Alexa skill.
+export async function answerRecall(user: AuthedUser, query: string): Promise<RecallResult> {
   const itemsRef = db.collection("users").doc(user.apiKey).collection("items");
 
   if (isReminderQuery(query)) {
@@ -116,39 +107,29 @@ export const recall = onRequest({ cors: true }, async (req, res) => {
         .orderBy("remindAt", "asc")
         .get();
     } catch {
-      res.status(500).json({ speak: "I couldn't reach your saved items." });
-      return;
+      return { speak: "I couldn't reach your saved items." };
     }
 
-    if (snap.empty) {
-      res.json({ speak: "Nothing on your list for that." });
-      return;
-    }
+    if (snap.empty) return { speak: "Nothing on your list for that." };
 
     const parts = snap.docs.map((doc) =>
       doc.data().isSecret ? "something you marked private" : doc.data().thing
     );
     const originals = snap.docs.filter((d) => !d.data().isSecret).map((d) => d.data().rawText);
     const speak = `You have ${parts.length} thing${parts.length > 1 ? "s" : ""}: ${parts.join(", ")}.`;
-    res.json({ speak, originals });
-    return;
+    return { speak, originals };
   }
 
   let snap;
   try {
     snap = await itemsRef.get();
   } catch {
-    res.status(500).json({ speak: "I couldn't reach your saved items." });
-    return;
+    return { speak: "I couldn't reach your saved items." };
   }
 
   const items = snap.docs.map((doc) => doc.data() as Item);
   const bestIdx = bestMatchIndex(query, items);
-
-  if (bestIdx === -1) {
-    res.json({ speak: "I couldn't find anything about that." });
-    return;
-  }
+  if (bestIdx === -1) return { speak: "I couldn't find anything about that." };
 
   const best = items[bestIdx];
   if (best.isSecret) {
@@ -157,10 +138,25 @@ export const recall = onRequest({ cors: true }, async (req, res) => {
     await snap.docs[bestIdx].ref
       .update({ unread: true, lastAskedAt: FieldValue.serverTimestamp() })
       .catch(() => undefined);
-    res.json({ speak: "That's something you marked private. Check your phone for the details." });
-    return;
+    return { speak: "That's something you marked private. Check your phone for the details." };
   }
 
   // "original" is always returned so the client can offer "read me the original".
-  res.json({ speak: speakItem(best), original: best.rawText });
+  return { speak: speakItem(best), original: best.rawText };
+}
+
+export const recall = onRequest({ cors: true }, async (req, res) => {
+  const user = await getUserFromRequest(req);
+  if (!user) {
+    res.status(401).send("unauthorized");
+    return;
+  }
+
+  const { query } = req.body ?? {};
+  if (!query || typeof query !== "string") {
+    res.status(400).send("missing query");
+    return;
+  }
+
+  res.json(await answerRecall(user, query));
 });

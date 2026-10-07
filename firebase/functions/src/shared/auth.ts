@@ -13,7 +13,10 @@ export interface AuthedUser {
 export async function getUserFromRequest(req: Request): Promise<AuthedUser | null> {
   const apiKey = req.header("x-app-key");
   if (!apiKey) return null;
+  return getUserByApiKey(apiKey);
+}
 
+export async function getUserByApiKey(apiKey: string): Promise<AuthedUser | null> {
   const snap = await db.collection("users").doc(apiKey).get();
   if (!snap.exists) return null;
 
