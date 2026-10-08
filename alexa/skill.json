@@ -1,0 +1,39 @@
+{
+  "manifest": {
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "Junk Drawer",
+          "summary": "Remember where you put things, and what you need to do.",
+          "description": "Tell the junk drawer where you put something or what you need to remember, then ask for it back later. Link it to your Junk Drawer account once with a code from the app.",
+          "examplePhrases": [
+            "Alexa, tell junk drawer to remember my keys are in the hall closet",
+            "Alexa, ask junk drawer where are my keys",
+            "Alexa, ask junk drawer what's on for today"
+          ],
+          "keywords": ["memory", "reminders", "notes"]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "testingInstructions": "Generate a link code in the Junk Drawer app, then say: Alexa, tell junk drawer to link <code>.",
+      "category": "ORGANIZERS_AND_ASSISTANTS",
+      "distributionCountries": ["US"]
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "https://us-west3-REPLACE_PROJECT_ID.cloudfunctions.net/alexa",
+          "sslCertificateType": "Wildcard"
+        }
+      }
+    },
+    "manifestVersion": "1.0",
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    }
+  }
+}

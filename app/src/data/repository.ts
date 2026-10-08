@@ -18,4 +18,6 @@ export interface ItemsRepository {
   /** Resolves true if the PIN is right; the repository then reveals secrets. */
   unlock(pin: string): Promise<boolean>;
   lock(): void;
+  /** A short-lived 6-digit code to say to Alexa ("tell junk drawer to link 123456"). */
+  alexaLinkCode(): Promise<{ code: string; expiresInMinutes: number }>;
 }

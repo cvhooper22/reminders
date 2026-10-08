@@ -73,6 +73,11 @@ export class MockRepository implements ItemsRepository {
   lock() {
     this.open = false;
   }
+
+  async alexaLinkCode() {
+    await delay(60);
+    return { code: '123456', expiresInMinutes: 10 };
+  }
 }
 
 export const DEMO_PIN_HINT = DEMO_PIN;

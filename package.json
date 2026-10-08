@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "backend": "npm --prefix firebase/functions run build && cd firebase && firebase emulators:start --project demo-reminders --only functions,firestore",
+    "backend": "npm --prefix firebase/functions run build && cd firebase && ALEXA_SKIP_VERIFY=true firebase emulators:start --project demo-reminders --only functions,firestore",
     "seed": "npm --prefix firebase/functions run build && node firebase/functions/scripts/seed.js",
     "try": "npm --prefix firebase/functions run build --silent && node firebase/functions/scripts/try-capture.js",
     "e2e": "node firebase/functions/scripts/e2e.js",
