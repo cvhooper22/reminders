@@ -11,7 +11,7 @@ import { onRequest } from "firebase-functions/v2/https";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { db } from "./admin";
 import { getUserFromRequest, type AuthedUser } from "./shared/auth";
-import { startOfLocalDay } from "./shared/tz";
+import { startOfLocalDay, tzOffsetMinutes } from "./shared/tz";
 
 interface Item {
   kind?: string;
@@ -31,24 +31,72 @@ export function speakItem(item: Item): string {
   return item.location ? `You put the ${item.thing} ${item.location}.` : `${item.thing}.`;
 }
 
-function isReminderQuery(query: string): boolean {
-  return /\b(today|tomorrow|this week|upcoming|due|reminders?)\b/i.test(query);
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const WEEKDAY_PATTERN = new RegExp(`\\b(${WEEKDAYS.join("|")})\\b`, "i");
+
+type Window = { start: Date; end: Date };
+
+// The span of time a question is about ("next week", "friday", "today"), or null when it
+// names none. Boundaries are the person's local midnights, not the server's (UTC); weeks run
+// Monday to Sunday. Spans are [start, end] with end being the last millisecond.
+function namedPeriod(query: string, timeZone: string, now: Date): Window | null {
+  const dayStart = (daysAhead: number) => startOfLocalDay(now, timeZone, daysAhead);
+  const span = (from: number, toExclusive: number): Window => ({
+    start: dayStart(from),
+    end: new Date(dayStart(toExclusive).getTime() - 1),
+  });
+  // Day-of-month arithmetic runs on the local date, then maps back to whole-day offsets.
+  const local = new Date(now.getTime() + tzOffsetMinutes(timeZone, now) * 60000);
+  const dow = local.getUTCDay();
+  const daysToMonth = (monthsAhead: number) =>
+    Math.round(
+      (Date.UTC(local.getUTCFullYear(), local.getUTCMonth() + monthsAhead, 1) -
+        Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate())) /
+        86400000
+    );
+  const nextMonday = 7 - ((dow + 6) % 7);
+
+  if (/\bnext week\b/i.test(query)) return span(nextMonday, nextMonday + 7);
+  if (/\bthis week\b/i.test(query)) return span(0, nextMonday);
+  if (/\bweekend\b/i.test(query)) {
+    const saturday = dow === 0 ? -1 : 6 - dow;
+    return span(saturday, saturday + 2);
+  }
+  if (/\bnext month\b/i.test(query)) return span(daysToMonth(1), daysToMonth(2));
+  if (/\bthis month\b/i.test(query)) return span(0, daysToMonth(1));
+  if (/\btomorrow\b/i.test(query)) return span(1, 2);
+  if (/\b(today|tonight)\b/i.test(query)) return span(0, 1);
+  const weekday = query.match(WEEKDAY_PATTERN);
+  if (weekday) {
+    const ahead = (WEEKDAYS.indexOf(weekday[1].toLowerCase()) - dow + 7) % 7;
+    return span(ahead, ahead + 1);
+  }
+  return null;
 }
 
-// Day boundaries are the person's local midnights, not the server's (UTC).
-function reminderWindow(query: string, timeZone: string): { start: Date; end: Date } {
+// "before next week" -> everything from today up to the end of this week.
+// "by friday" -> through the end of Friday. A bare period ("today", "next week") is that span.
+// null when the question names no time at all.
+export function reminderWindow(query: string, timeZone: string, now = new Date()): Window | null {
+  const period = namedPeriod(query, timeZone, now);
+  if (!period) return null;
+  const todayStart = startOfLocalDay(now, timeZone, 0);
+  if (/\bbefore\b/i.test(query)) {
+    return { start: todayStart, end: new Date(period.start.getTime() - 1) };
+  }
+  if (/\b(by|until|till|through)\b/i.test(query)) {
+    return { start: todayStart, end: period.end };
+  }
+  return period;
+}
+
+// A time phrase, or a plain ask for the list ("what's due", "my reminders") which means today.
+function reminderQueryWindow(query: string, timeZone: string): Window | null {
+  const window = reminderWindow(query, timeZone);
+  if (window) return window;
+  if (!/\b(upcoming|due|reminders?)\b/i.test(query)) return null;
   const now = new Date();
-  const endOfDay = (daysAhead: number) =>
-    new Date(startOfLocalDay(now, timeZone, daysAhead + 1).getTime() - 1);
-  if (/tomorrow/i.test(query)) {
-    return { start: startOfLocalDay(now, timeZone, 1), end: endOfDay(1) };
-  }
-  if (/this week/i.test(query)) {
-    const end = new Date(now);
-    end.setDate(end.getDate() + 7);
-    return { start: now, end };
-  }
-  return { start: now, end: endOfDay(0) };
+  return { start: startOfLocalDay(now, timeZone, 0), end: new Date(startOfLocalDay(now, timeZone, 1).getTime() - 1) };
 }
 
 const STOPWORDS = new Set([
@@ -96,8 +144,9 @@ export type RecallResult = { speak: string; originals?: string[]; original?: str
 export async function answerRecall(user: AuthedUser, query: string): Promise<RecallResult> {
   const itemsRef = db.collection("users").doc(user.apiKey).collection("items");
 
-  if (isReminderQuery(query)) {
-    const { start, end } = reminderWindow(query, user.timezone);
+  const window = reminderQueryWindow(query, user.timezone);
+  if (window) {
+    const { start, end } = window;
 
     let snap;
     try {
